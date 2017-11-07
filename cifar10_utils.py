@@ -9,10 +9,10 @@ from __future__ import print_function
 import numpy as np
 import os
 import pickle
+import collections
 
-
-from tensorflow.contrib.learn.python.learn.datasets import base
-
+# from tensorflow.contrib.learn.python.learn.datasets import base
+Datasets = collections.namedtuple('Datasets', ['train', 'validation', 'test'])
 # Default paths for downloading CIFAR10 data
 CIFAR10_FOLDER = 'cifar10/cifar-10-batches-py'
 
@@ -216,7 +216,7 @@ def read_data_sets(data_dir, one_hot = True, validation_size = 0):
   validation = DataSet(validation_images, validation_labels)
   test = DataSet(test_images, test_labels)
 
-  return base.Datasets(train=train, validation=validation, test=test)
+  return Datasets(train=train, validation=validation, test=test)
 
 def get_cifar10(data_dir = CIFAR10_FOLDER, one_hot = True, validation_size = 0):
   """

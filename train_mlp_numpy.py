@@ -8,17 +8,19 @@ from __future__ import print_function
 import argparse
 import numpy as np
 import os
+from mlp_numpy import MLP
+import cifar10_utils as utils
 
 # Default constants
 LEARNING_RATE_DEFAULT = 2e-3
-WEIGHT_REGULARIZER_STRENGTH_DEFAULT = 0.
+WEIGHT_REGULARIZER_STRENGTH_DEFAULT = 0.001
 WEIGHT_INITIALIZATION_SCALE_DEFAULT = 1e-4
 BATCH_SIZE_DEFAULT = 200
 MAX_STEPS_DEFAULT = 1500
 DNN_HIDDEN_UNITS_DEFAULT = '100'
 
 # Directory in which cifar data is saved
-DATA_DIR_DEFAULT = './cifar10/cifar-10-batches-py'
+DATA_DIR_DEFAULT = 'cifar10/cifar-10-batches-py'
 
 FLAGS = None
 
@@ -41,7 +43,35 @@ def train():
   ########################
   # PUT YOUR CODE HERE  #
   #######################
-  raise NotImplementedError
+
+  model = MLP(n_hidden=dnn_hidden_units,n_classes=10,batch_size=FLAGS.batch_size, input_dim=32*32*3, 
+            weight_decay=FLAGS.weight_reg_strength, weight_scale=FLAGS.weight_init_scale)
+
+  Datasets = utils.get_cifar10(data_dir = DATA_DIR_DEFAULT, one_hot = True, validation_size = 0)
+  
+  for i in range(1500): #(FLAGS.max_steps):
+    train_batch = Datasets.train.next_batch(batch_size = FLAGS.batch_size)
+    #Get the model output
+    logits = model.inference(x=train_batch[0].reshape([FLAGS.batch_size,32*32*3]))
+    # print('logits', logits)
+    # print('sum logits', np.sum(logits))
+    #Get the loss and let the model set the loss derivative.
+    loss = model.loss(logits=logits, labels=train_batch[1])
+
+
+    #Perform training step
+    model.train_step(loss=loss, flags=FLAGS)
+
+    #Every 100th iteratin print accuracy on the whole test set.
+    if i % 100 == 0:
+      # for layer in model.layers:
+      #   print('weights', layer["weights"])
+      #   print('bias', layer["bias"])
+      test_batch = Datasets.test.next_batch(batch_size = 200) #Datasets.test.num_examples
+      logits = model.inference(x=test_batch[0].reshape([200,32*32*3]))
+      # print('test logits', logits)
+      print('-- Step: ', i, " accuracy: ",model.accuracy(logits=logits,labels=test_batch[1]),'loss', loss )
+
   ########################
   # END OF YOUR CODE    #
   #######################
