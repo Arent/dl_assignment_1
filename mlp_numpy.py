@@ -46,11 +46,11 @@ class MLP(object):
 
     self.layers = []
     for  size_in, size_out in zip([self. input_dim]+ self.n_hidden , self.n_hidden + [self.n_classes]):
+      #TODO FIX BIAS NO BATHC
       layer = {}
       layer["weights"] = np.random.normal(0, weight_scale, [size_in, size_out]) 
       layer["bias"]  = np.zeros([batch_size, size_out])
       layer["activation_function"] = self.relu 
-      layer["size"] = size_out
 
       self.layers.append(layer)
 
@@ -129,6 +129,7 @@ class MLP(object):
     #with label 1 and with label 0, then the cross entropy is calculated for both. 
     # another aprouch would be: -np.sum(np.log((labels + labels -1) * logits1  + (1-labels)))
     # Which is only marginally faster
+    # TODO MAKE PRETIER
     loss_label_1 = -np.sum(np.log(np.maximum(1- logits.flatten()[labels.flatten() ==1], 10**(-10)))) 
     # print('loss_label_1',loss_label_1)
     loss_label_0 = -np.sum(np.log(np.maximum(1- logits.flatten()[labels.flatten() ==0], 10**(-10)))) 
@@ -162,6 +163,7 @@ class MLP(object):
     #Calculate deltas
     #The delta of the last layer is the derivative of the loss function
     self.layers[-1]["delta"] = self.loss_derivative
+    
     #Loop over the layers in reversed order,  layer_i_1 = layer_i-1, layer_= layer i
     for layer_i_1, layer_i in zip(reversed(self.layers[0:-1]), reversed(self.layers)):
       f = layer_i_1["activation_function"]
@@ -223,8 +225,8 @@ class MLP(object):
     return x
 
   def softmax(self, x):
-    e_x = np.exp(x - np.max(x,axis=1)[:,np.newaxis])
-    return e_x / np.sum(e_x,axis=1)[:,np.newaxis]
+    e_x = np.exp(x - np.max(x, axis=1)[:,np.newaxis])
+    return e_x / np.sum(e_x, axis=1)[:,np.newaxis]
 
 
 

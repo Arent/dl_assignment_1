@@ -53,23 +53,16 @@ def train():
     train_batch = Datasets.train.next_batch(batch_size = FLAGS.batch_size)
     #Get the model output
     logits = model.inference(x=train_batch[0].reshape([FLAGS.batch_size,32*32*3]))
-    # print('logits', logits)
-    # print('sum logits', np.sum(logits))
     #Get the loss and let the model set the loss derivative.
     loss = model.loss(logits=logits, labels=train_batch[1])
-
-
     #Perform training step
     model.train_step(loss=loss, flags=FLAGS)
 
     #Every 100th iteratin print accuracy on the whole test set.
     if i % 100 == 0:
       # for layer in model.layers:
-      #   print('weights', layer["weights"])
-      #   print('bias', layer["bias"])
       test_batch = Datasets.test.next_batch(batch_size = 200) #Datasets.test.num_examples
       logits = model.inference(x=test_batch[0].reshape([200,32*32*3]))
-      # print('test logits', logits)
       print('-- Step: ', i, " accuracy: ",model.accuracy(logits=logits,labels=test_batch[1]),'loss', loss )
 
   ########################
