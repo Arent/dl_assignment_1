@@ -9,6 +9,12 @@ import tensorflow as tf
 from tensorflow.contrib.layers import xavier_initializer
 from tensorflow.contrib.layers import l1_regularizer, l2_regularizer
 
+
+
+
+
+
+
 class MLP(object):
   """
   This class implements a Multi-layer Perceptron in Tensorflow.
@@ -17,10 +23,11 @@ class MLP(object):
   can also be used for evaluating prediction performance.
   """
 
-  def __init__(self, n_hidden, n_classes, is_training,
-               activation_fn = tf.nn.relu, dropout_rate = 0.,
+  def __init__(self, n_hidden, n_classes, is_training,input_dim=32*32*3,
+               activation_fn = tf.nn.relu, dropout_rate = 0.1,
                weight_initializer = xavier_initializer(),
-               weight_regularizer = l2_regularizer(0.001)):
+               weight_regularizer = l2_regularizer(0.001),
+               optimizer= tf.train.AdamOptimizer(1e-3)):
     """
     Constructor for an MLP object. Default values should be used as hints for
     the usage of each parameter.
@@ -49,6 +56,7 @@ class MLP(object):
                                a weight variable. The returned loss will be added to
                                the total loss for training purposes.
     """
+    self.input_dim = input_dim
     self.n_hidden = n_hidden
     self.n_classes = n_classes
     self.is_training = is_training
@@ -56,6 +64,34 @@ class MLP(object):
     self.dropout_rate = dropout_rate
     self.weight_initializer = weight_initializer
     self.weight_regularizer = weight_regularizer
+    self.optimizer = optimizer
+    self.layer_sizes =[input_dim] + n_hidden
+
+    in_sizes = [self.input_dim] + self.n_hidden
+    out_sizes = self.n_hidden + [self.n_classes]
+    #This part creates initializers for each weight and bias variable.
+    #Also it creates the weight and bias viariables. 
+    for i, (size_in, size_out) in enumerate(zip(in_sizes,out_sizes)):
+      print("initing layer",i+1 )
+      print("(size_in, size_out) ", size_in, size_out)
+      with tf.variable_scope("layer" + str(i+1)):
+        weights = tf.get_variable("weights", shape=[size_in, size_out], 
+                                  initializer=self.weight_initializer,
+                                  regularizer=self.weight_regularizer)
+        biases = tf.get_variable("biases", initializer=tf.zeros([size_out]))
+
+
+
+  def fully_connected_layer(self, layer_name, x, activation_fn ):
+    # This function creates a fully connected layer.
+    with tf.variable_scope(layer_name, reuse=True):
+      weights = tf.get_variable("weights")
+      biases = tf.get_variable("biases")
+      output = tf.matmul(x, weights) + biases
+      activated_output = activation_fn(output)
+      activated_output_with_dropout = tf.nn.dropout(activated_output, self.dropout_rate) 
+    return activated_output_with_dropout
+
 
   def inference(self, x):
     """
@@ -92,8 +128,23 @@ class MLP(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    raise NotImplementedError
-    ########################
+
+    #compute hidden layers, the output of one layer is the input in the next layer. 
+    #For the first alter x is the input. 
+
+    output = x
+    print(x)
+    for i, size in enumerate(self.n_hidden):
+      print('inferencing layer', i+1 )
+      output = self.fully_connected_layer('layer'+str(i+1), output, self.activation_fn)
+
+    #compute last layer
+    with tf.variable_scope('layer'+str(len(self.n_hidden)+1), reuse = True):
+      weights = tf.get_variable("weights")
+      biases = tf.get_variable("biases")
+      logits = tf.matmul(output, weights) + biases
+      #last layer has no activation or dropout. 
+      ########################
     # END OF YOUR CODE    #
     #######################
 
@@ -125,7 +176,8 @@ class MLP(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    raise NotImplementedError
+    #The function softmax_cross_entropy_with_logits is robust against numerical instabilities
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -146,7 +198,7 @@ class MLP(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    raise NotImplementedError
+    train_step = self.optimizer.minimize(loss)
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -175,7 +227,13 @@ class MLP(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    raise NotImplementedError
+
+    #tf.argmax(logits, axis=1) returns the indices of the maximum of the logits vector.
+    #This is done per line in the batch. Count the instances where the index of label 1 and the maximum
+    #logits are equal.
+
+    correct   = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
+    accuracy  = tf.reduce_mean(tf.cast(correct, tf.float32))
     ########################
     # END OF YOUR CODE    #
     #######################
