@@ -26,48 +26,44 @@ class ConvNet(object):
     self.n_classes = n_classes
 
 
-  def conv_layer(self, input_data, name_scope, out_channels, filter_shape=[5,5], activation_fn= tf.nn.relu,
+  def conv_layer(self, input_data, name_scope, in_channels, out_channels, output_shape, filter_shape=[5,5], activation_fn= tf.nn.relu,
                 strides=[1,1,1,1], padding="SAME", pooling_stride=[2,2], pooling_kernel=[3,3]):
     #function that performs convolution, activation and max pooling
-      in_shape = input_data.get_shape()
+    weight_shape = filter_shape +[in_channels, out_channels]
+    bias_shape = output_shape + [out_channels ]
 
-      batch_size=in_shape[0]
-      in_channels= in_shape[3]
-      print('inchannels', in_channels)
-      weight_shape = filter_shape +[in_channels, out_channels]
-      bias_shape = [float(in_shape[1])/pooling_stride[0], float(in_shape[2])/pooling_stride[1],out_channels ]
-      with tf.variable_scope(name_scope):
-        filter_weights = tf.get_variable("weights", shape=weight_shape)
-        biases = tf.get_variable("biases", initializer=tf.zeros(bias_shape)) #TODO MAKE THIS DYNAMIC
-        
-        output = tf.nn.conv2d(
-                      input=input_data,
-                      filter=filter_weights,
-                      strides=strides,
-                      padding=padding,
-                      use_cudnn_on_gpu=False,
-                      name='convolution')
-        if activation_fn is not None:
-          output = activation_fn(output + biases)
-
-        output_layer1 =tf.nn.max_pool(
-                      value=output,
-                      ksize=[1] + pooling_kernel + [1],
-                      strides=[1] + pooling_stride + [1],
-                      padding="SAME" ,
-                      name='Maxpooling')
-
-
-  def fully_connected_layer(self, name_scope, input_data,output_dimensions,  activation_fn=tf.nn.relu, dropout_rate=0 ):
-    # This function creates a fully connected layer.
-    in_shape = input_data.get_shape()
     with tf.variable_scope(name_scope):
-      weights = tf.get_variable("weights", shape=[in_shape[1], output_dimensions])
+      filter_weights = tf.get_variable("weights", shape=weight_shape)
+      biases = tf.get_variable("biases", initializer=tf.zeros(bias_shape)) #TODO MAKE THIS DYNAMIC
+      
+      output = tf.nn.conv2d(
+                    input=input_data,
+                    filter=filter_weights,
+                    strides=strides,
+                    padding=padding,
+                    use_cudnn_on_gpu=False,
+                    name='convolution')
+      if activation_fn is not None:
+        output = activation_fn(output + biases)
+
+      output_layer1 =tf.nn.max_pool(
+                    value=output,
+                    ksize=[1] + pooling_kernel + [1],
+                    strides=[1] + pooling_stride + [1],
+                    padding="SAME" ,
+                    name='Maxpooling')
+    return output_layer1
+
+
+  def fully_connected_layer(self, name_scope, input_data,input_dimensions, output_dimensions,  activation_fn=tf.nn.relu, dropout_rate=0 ):
+    # This function creates a fully connected layer.
+    with tf.variable_scope(name_scope):
+      weights = tf.get_variable("weights", shape=[input_dimensions, output_dimensions])
       biases = tf.get_variable("biases", shape=[1,output_dimensions])
-      output = tf.matmul(x, weights) + biases
+      output = tf.matmul(input_data, weights) + biases
       if activation_fn is not None:
         output = activation_fn(output)
-      output = tf.nn.dropout(activated_output, 1.0 - dropout_rate) 
+      output = tf.nn.dropout(output, 1.0 - dropout_rate) 
     return output
 
   def inference(self, x):
@@ -100,14 +96,20 @@ class ConvNet(object):
     ########################
     # PUT YOUR CODE HERE  #
     ########################
-    output_conv1 = self.conv_layer(input_data=x, name_scope='conv1', out_channels=64)
-    output_conv2 = self.conv_layer(input_data=output_conv1, name_scope='conv1', out_channels=64)
+
+    output_conv1 = self.conv_layer(input_data=x, name_scope='conv1', 
+      in_channels=3, out_channels=64, output_shape=[32,32])
+    output_conv2 = self.conv_layer(input_data=output_conv1, name_scope='conv2',
+      in_channels=64, out_channels=64, output_shape=[16,16])
+    
+    batch_size = tf.shape(x)[0]
     input_fc = tf.reshape(output_conv2,[batch_size,-1])
-    output_fc1 = self.fully_connected_layer(name_scope="fc1", input_data=input_fc,output_dimensions=384,
+
+    output_fc1 = self.fully_connected_layer(name_scope="fc1", input_data=input_fc,input_dimensions=8*8*64, output_dimensions=384,
                                             activation_fn=tf.nn.relu, dropout_rate=0)
-    output_fc2 = self.fully_connected_layer(name_scope="fc2", input_data=output_fc1,output_dimensions=192,
+    output_fc2 = self.fully_connected_layer(name_scope="fc2", input_data=output_fc1,input_dimensions=384, output_dimensions=192,
                                             activation_fn=tf.nn.relu, dropout_rate=0)
-    logits= self.fully_connected_layer(name_scope="fc3", input_data=output_fc2,output_dimensions=10,
+    logits= self.fully_connected_layer(name_scope="fc3", input_data=output_fc2, input_dimensions=192, output_dimensions=10,
                                             activation_fn=None, dropout_rate=0)
 
       ########################
