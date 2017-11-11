@@ -7,6 +7,9 @@ import os
 
 import tensorflow as tf
 import numpy as np
+from convnet_tf import ConvNet
+import cifar10_utils as utils
+
 
 LEARNING_RATE_DEFAULT = 1e-4
 BATCH_SIZE_DEFAULT = 128
@@ -56,8 +59,38 @@ def train():
   ########################
   # PUT YOUR CODE HERE  #
   ########################
-  raise NotImplementedError
-  ########################
+  model =  ConvNet( n_classes=10)
+
+  x = tf.placeholder(dtype=tf.float32)
+  labels = tf.placeholder(dtype=tf.float32)
+
+  logits = model.inference(x)
+  loss = model.loss(logits=logits, labels=labels)
+  train_op = model.train_step(loss=loss, flags=FLAGS)
+  accuracy = model.accuracy(logits=logits, labels=labels)
+
+  Datasets = utils.get_cifar10(data_dir = DATA_DIR_DEFAULT, one_hot = True, validation_size = 0)
+  with tf.Session() as sess:
+    sess.run(tf.global_variables_initializer())
+
+
+    for i in range(FLAGS.max_steps): 
+      train_batch = Datasets.train.next_batch(batch_size = FLAGS.batch_size)
+      train_data = train_batch[0]
+      train_labels = train_batch[1]
+      #Get the model output
+      #Perform training step
+      t, loss_e = sess.run([train_op, loss], feed_dict={x:train_data, labels:train_labels })
+      # print('step: ', i, 'training_loss:', loss_e)
+      #Every 100th iteratin print accuracy on the whole test set.
+      if i % 100 == 0:
+        # for layer in model.layers:
+        test_batch = Datasets.test.next_batch(batch_size = 10000) 
+        test_data = test_batch[0]
+        test_labels = test_batch[1]
+        accuracy_e, loss_e = sess.run([accuracy, loss],feed_dict={x:test_data,labels:test_labels } )
+        print('-- Step: ', i, " accuracy: ",accuracy_e,'loss', loss_e )
+  ########################  ########################
   # END OF YOUR CODE    #
   ########################
 

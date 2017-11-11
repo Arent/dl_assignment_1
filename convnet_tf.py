@@ -55,8 +55,67 @@ class ConvNet(object):
     ########################
     # PUT YOUR CODE HERE  #
     ########################
-    raise NotImplementedError
-    ########################
+    batch_size = tf.shape(x)[0]
+    with tf.variable_scope("conv1"): 
+      filter_weights = tf.get_variable("weights", shape=[5, 5, 3, 64])
+      print("TF.SHAPE(X)",tf.shape(x))
+      biases = tf.get_variable("biases", initializer=tf.zeros([32, 32, 64])) #TODO MAKE THIS DYNAMIC
+      output = tf.nn.conv2d(
+                    input=x,
+                    filter=filter_weights,
+                    strides=[1,1,1,1],
+                    padding="SAME",
+                    use_cudnn_on_gpu=False,
+                    name='convolution')
+      activated_output = tf.nn.relu(output + biases)
+
+      output_layer1 =tf.nn.max_pool(
+                    value=activated_output,
+                    ksize=[1,3,3,1],
+                    strides=[1,2,2,1],
+                    padding="SAME",
+                    name='Maxpooling')
+
+    with tf.variable_scope("conv2"): 
+      filter_weights = tf.get_variable("weights", shape=[5, 5, 64, 64])
+      biases = tf.get_variable("biases", initializer=tf.zeros([16, 16, 64]))
+      output = tf.nn.conv2d(
+                    input=output_layer1,
+                    filter=filter_weights,
+                    strides=[1,1,1,1],
+                    padding="SAME",
+                    use_cudnn_on_gpu=False,
+                    name='convolution')
+      activated_output = tf.nn.relu(output + biases)
+
+      output_layer2 =tf.nn.max_pool(
+                    value=activated_output,
+                    ksize=[1,3,3,1],
+                    strides=[1,2,2,1],
+                    padding="SAME",
+                    name='Maxpooling')
+
+    with tf.variable_scope("fc1"):
+      input_fc = tf.reshape(output_layer2,[batch_size,-1])
+      dimensions = tf.shape(input_fc)[1]
+      weights = tf.get_variable("weights",shape=[8*8*64, 384] )
+      biases = tf.get_variable("biases", initializer=tf.zeros([1,384]))
+      output = tf.matmul(input_fc, weights) + biases
+      activated_output = tf.nn.relu(output)
+
+    with tf.variable_scope("fc2"):
+      weights = tf.get_variable("weights",shape=[384, 192] )
+      biases = tf.get_variable("biases", initializer=tf.zeros([1,192]))
+      output = tf.matmul(activated_output, weights) + biases
+      activated_output = tf.nn.relu(output)
+
+    with tf.variable_scope("fc3"):
+      weights = tf.get_variable("weights",shape=[192, 10] )
+      biases = tf.get_variable("biases", initializer=tf.zeros([1,10]))
+      output = tf.matmul(activated_output, weights) + biases
+      logits = output    
+
+      ########################
     # END OF YOUR CODE    #
     ########################
     return logits
@@ -88,7 +147,7 @@ class ConvNet(object):
     ########################
     # PUT YOUR CODE HERE  #
     ########################
-    raise NotImplementedError
+    loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
     ########################
     # END OF YOUR CODE    #
     ########################
@@ -109,7 +168,8 @@ class ConvNet(object):
     ########################
     # PUT YOUR CODE HERE  #
     #######################
-    raise NotImplementedError
+    optimizer = tf.train.AdamOptimizer(flags.learning_rate)
+    train_step = optimizer.minimize(loss)
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -138,7 +198,8 @@ class ConvNet(object):
     ########################
     # PUT YOUR CODE HERE  #
     ########################
-    raise NotImplementedError
+    correct   = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
+    accuracy  = tf.reduce_mean(tf.cast(correct, tf.float32))
     ########################
     # END OF YOUR CODE    #
     ########################
