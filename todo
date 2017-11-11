@@ -1,0 +1,28 @@
+Pen en Paper assignments
+ - Handmatig backprop afmaken
+ - vraag 3 en vier doen
+
+Numpy MLP:
+ - Bias fixen
+ - accuracy bepalen op hele testset
+ - plots maken
+
+Tensorflow MLP
+ - Tensorboard plots maken
+ - Testen of alle input combinaties werken
+ - Dropout fixen
+ - Onderzoeksvraag beantwoorden
+
+
+Tensorflow Convnet
+- Inference splitten in Conv functies en FF funcites
+- Dynamisch de shape bepalen ipv handmatig
+- Tensorboard summaries toevoegen
+- Model saven/ checkpoint maken
+- Twee van deze dingen toeveogen:
+     1. [Batch Normalization](https://arxiv.org/abs/1502.03167)
+     2. Skip Connections as in [ResNet](https://arxiv.org/abs/1512.03385) or [DenseNet](https://arxiv.org/abs/1608.06993)
+     3. Data augmentation -- augment your training images (maybe test images as well) with some perturbations like scaling, shifting, color jittering to increase dataset variability.   
+     4. [Depthwise separable convolutions](https://arxiv.org/abs/1610.02357)
+     5. MOELIJK[Steerable Convolutions](https://openreview.net/pdf?id=rJQKYt5ll)
+ 
