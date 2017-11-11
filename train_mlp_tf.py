@@ -13,7 +13,7 @@ import cifar10_utils as utils
 
 # Default constants
 LEARNING_RATE_DEFAULT = 2e-3
-WEIGHT_REGULARIZER_STRENGTH_DEFAULT = 0.
+WEIGHT_REGULARIZER_STRENGTH_DEFAULT = 0.001
 WEIGHT_INITIALIZATION_SCALE_DEFAULT = 1e-4
 BATCH_SIZE_DEFAULT = 200
 MAX_STEPS_DEFAULT = 1500
@@ -109,13 +109,10 @@ def train():
   # PUT YOUR CODE HERE  #
   #######################
   model =  MLP(n_hidden=dnn_hidden_units, n_classes=10, is_training=True,input_dim=32*32*3,
-               activation_fn = activation_fn, dropout_rate = 0.99999,
-               weight_initializer = initializer,
-               weight_regularizer = regularizer,
-               optimizer= optimizer)
+               activation_fn = activation_fn, dropout_rate = 0.5)
 
-  x = tf.placeholder(dtype=tf.float32, shape=[FLAGS.batch_size, 32*32*3])
-  labels = tf.placeholder(dtype=tf.float32,shape=[FLAGS.batch_size, 10])
+  x = tf.placeholder(dtype=tf.float32)
+  labels = tf.placeholder(dtype=tf.float32)
 
   logits = model.inference(x)
   loss = model.loss(logits=logits, labels=labels)
@@ -138,8 +135,8 @@ def train():
       #Every 100th iteratin print accuracy on the whole test set.
       if i % 100 == 0:
         # for layer in model.layers:
-        test_batch = Datasets.test.next_batch(batch_size = FLAGS.batch_size) 
-        test_data = test_batch[0].reshape([FLAGS.batch_size,-1])
+        test_batch = Datasets.test.next_batch(batch_size = 10000) 
+        test_data = test_batch[0].reshape([10000,-1])
         test_labels = test_batch[1]
         accuracy_e, loss_e = sess.run([accuracy, loss],feed_dict={x:test_data,labels:test_labels } )
         print('-- Step: ', i, " accuracy: ",accuracy_e,'loss', loss_e )

@@ -26,8 +26,8 @@ class MLP(object):
   def __init__(self, n_hidden, n_classes, is_training,input_dim=32*32*3,
                activation_fn = tf.nn.relu, dropout_rate = 0.1,
                weight_initializer = xavier_initializer(),
-               weight_regularizer = l2_regularizer(0.001),
-               optimizer= tf.train.AdamOptimizer(1e-3)):
+               weight_regularizer = l2_regularizer(0.005),
+               optimizer= tf.train.AdamOptimizer(0.002)):
     """
     Constructor for an MLP object. Default values should be used as hints for
     the usage of each parameter.
@@ -72,8 +72,6 @@ class MLP(object):
     #This part creates initializers for each weight and bias variable.
     #Also it creates the weight and bias viariables. 
     for i, (size_in, size_out) in enumerate(zip(in_sizes,out_sizes)):
-      print("initing layer",i+1 )
-      print("(size_in, size_out) ", size_in, size_out)
       with tf.variable_scope("layer" + str(i+1)):
         weights = tf.get_variable("weights", shape=[size_in, size_out], 
                                   initializer=self.weight_initializer,
@@ -135,7 +133,6 @@ class MLP(object):
     output = x
     print(x)
     for i, size in enumerate(self.n_hidden):
-      print('inferencing layer', i+1 )
       output = self.fully_connected_layer('layer'+str(i+1), output, self.activation_fn)
 
     #compute last layer
