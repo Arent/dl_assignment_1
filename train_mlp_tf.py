@@ -16,13 +16,13 @@ LEARNING_RATE_DEFAULT = 2e-3
 WEIGHT_REGULARIZER_STRENGTH_DEFAULT = 0.001
 WEIGHT_INITIALIZATION_SCALE_DEFAULT = 1e-4
 BATCH_SIZE_DEFAULT = 200
-MAX_STEPS_DEFAULT = 1500
-DROPOUT_RATE_DEFAULT = 0.
-DNN_HIDDEN_UNITS_DEFAULT = '100'
-WEIGHT_INITIALIZATION_DEFAULT = 'normal'
+MAX_STEPS_DEFAULT = 2501 #2501
+DROPOUT_RATE_DEFAULT = 0.5
+DNN_HIDDEN_UNITS_DEFAULT = '350'
+WEIGHT_INITIALIZATION_DEFAULT = 'xavier'
 WEIGHT_REGULARIZER_DEFAULT = 'l2'
 ACTIVATION_DEFAULT = 'relu'
-OPTIMIZER_DEFAULT = 'sgd'
+OPTIMIZER_DEFAULT = 'adam'
 
 # Directory in which cifar data is saved
 DATA_DIR_DEFAULT = './cifar10/cifar-10-batches-py'
@@ -82,16 +82,20 @@ def train():
   if FLAGS.dnn_hidden_units:
     dnn_hidden_units = FLAGS.dnn_hidden_units.split(",")
     dnn_hidden_units = [int(dnn_hidden_unit_) for dnn_hidden_unit_ in dnn_hidden_units]
+    print('dnn_hidden_units',dnn_hidden_units )
   else:
     dnn_hidden_units = []
 
   #Add parguments to the initializer
-  if FLAGS.weight_init == 'xavier':
-    initializer = WEIGHT_INITIALIZATION_DICT['xavier']
+  if FLAGS.weight_init == 'normal':
+    initializer = WEIGHT_INITIALIZATION_DICT['normal']
+    initializer_arg = FLAGS.weight_init_scale
   elif FLAGS.weight_init == 'uniform':
-    initializer = WEIGHT_INITIALIZATION_DICT['uniform'](minval=-FLAGS.weight_init_scale, maxval=FLAGS.weight_init_scale)
-  elif FLAGS.weight_init == 'normal':
+    initializer = WEIGHT_INITIALIZATION_DICT['uniform']#() #(minval=-FLAGS.weight_init_scale, maxval=FLAGS.weight_init_scale)
+    initializer_stddev = None
+  elif FLAGS.weight_init == 'xavier':
     initializer = WEIGHT_INITIALIZATION_DICT['xavier']()
+    initializer_arg = None
 
     # initializer = WEIGHT_INITIALIZATION_DICT['normal']
 
@@ -108,38 +112,64 @@ def train():
   ########################
   # PUT YOUR CODE HERE  #
   #######################
-  model =  MLP(n_hidden=dnn_hidden_units, n_classes=10, is_training=True,input_dim=32*32*3,
-               activation_fn = activation_fn, dropout_rate = 0.5)
+  for layer in [100, 250]:
+    for dropout in [0.0, 0.25, 0.5, 0.75]: #, 0.5]:
+      for reg in [0.001, 0.01, 0.1]:#,0.01, 0.1, 0.5]: 
 
-  x = tf.placeholder(dtype=tf.float32)
-  labels = tf.placeholder(dtype=tf.float32)
+        train_logs_path = 'logs/cifar10/mlp_tf/train_scaled/layersize'+str(layer) + '_dr_' + str(dropout) + '_reg_' + str(reg) + '/'
+        test_logs_path = 'logs/cifar10/mlp_tf/test_scaled/layersize'+str(layer) + '_dr_' + str(dropout) + '_reg_' + str(reg) + '/'
 
-  logits = model.inference(x)
-  loss = model.loss(logits=logits, labels=labels)
-  train_op = model.train_step(loss=loss, flags=FLAGS)
-  accuracy = model.accuracy(logits=logits, labels=labels)
+        print(train_logs_path)
+        if not tf.gfile.Exists(train_logs_path):
+          tf.gfile.MakeDirs(train_logs_path)
+        if not tf.gfile.Exists(test_logs_path):
+          tf.gfile.MakeDirs(test_logs_path)
 
-  Datasets = utils.get_cifar10(data_dir = DATA_DIR_DEFAULT, one_hot = True, validation_size = 0)
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
+        regularizer = WEIGHT_REGULARIZER_DICT[FLAGS.weight_reg](reg)
+
+        model =  MLP(n_hidden=[layer], n_classes=10, is_training=True,input_dim=32*32*3,
+                     activation_fn = activation_fn, weight_initializer = initializer, initializer_stddev=None,
+                     weight_regularizer = regularizer,
+                     optimizer= optimizer)
+
+        x = tf.placeholder(dtype=tf.float32)
+        labels = tf.placeholder(dtype=tf.float32)
+        dropout_rate = tf.placeholder(dtype=tf.float32)
+
+        logits = model.inference(x, dropout_rate)
+        loss = model.loss(logits=logits, labels=labels)
+        train_op = model.train_step(loss=loss, flags=FLAGS)
+        accuracy = model.accuracy(logits=logits, labels=labels)
+
+        Datasets = utils.get_cifar10(data_dir = DATA_DIR_DEFAULT, one_hot = True, validation_size = 0)
+        train_merged_summary_op = tf.summary.merge_all(key='train')
+        test_merged_summary_op = tf.summary.merge_all(key='test')
+        with tf.Session() as sess:
+          sess.run(tf.global_variables_initializer())
+          train_summary_writer = tf.summary.FileWriter(train_logs_path, graph=tf.get_default_graph())
+          test_summary_writer = tf.summary.FileWriter(test_logs_path, graph=tf.get_default_graph())
 
 
-    for i in range(FLAGS.max_steps): 
-      train_batch = Datasets.train.next_batch(batch_size = FLAGS.batch_size)
-      train_data = train_batch[0].reshape(FLAGS.batch_size,-1)
-      train_labels = train_batch[1]
-      #Get the model output
-      #Perform training step
-      t, loss_e = sess.run([train_op, loss], feed_dict={x:train_data, labels:train_labels })
-      # print('step: ', i, 'training_loss:', loss_e)
-      #Every 100th iteratin print accuracy on the whole test set.
-      if i % 100 == 0:
-        # for layer in model.layers:
-        test_batch = Datasets.test.next_batch(batch_size = 10000) 
-        test_data = test_batch[0].reshape([10000,-1])
-        test_labels = test_batch[1]
-        accuracy_e, loss_e = sess.run([accuracy, loss],feed_dict={x:test_data,labels:test_labels } )
-        print('-- Step: ', i, " accuracy: ",accuracy_e,'loss', loss_e )
+          for i in range(FLAGS.max_steps): 
+            train_batch, train_labels = Datasets.train.next_batch(batch_size = FLAGS.batch_size)
+            train_data = train_batch.reshape(FLAGS.batch_size,-1) / 255.0
+            #Get the model output
+            #Perform training step
+            ac, t, loss_e, summary = sess.run([accuracy, train_op, loss, train_merged_summary_op], feed_dict={x:train_data, labels:train_labels, dropout_rate:dropout })
+
+            # Write logs at every iteration, only loss and accuracy
+            train_summary_writer.add_summary(summary, i)
+
+            #Every 100th iteratin print accuracy on the whole test set.
+            if i % 100 == 0:
+              # for layer in model.layers:
+              test_batch,  test_labels = Datasets.test.next_batch(batch_size = 10000) 
+              test_data = test_batch.reshape([10000,-1]) / 255.0
+              accuracy_e, loss_e, summary = sess.run([accuracy, loss, test_merged_summary_op],feed_dict={x:test_data,labels:test_labels, dropout_rate:0.0 } )
+              test_summary_writer.add_summary(summary, i)
+
+              print('-- Step: ', i, " accuracy: ",accuracy_e,'loss', loss_e )
+        tf.reset_default_graph()
   ########################
   # END OF YOUR CODE    #
   #######################

@@ -12,8 +12,8 @@ import cifar10_utils as utils
 
 
 LEARNING_RATE_DEFAULT = 1e-4
-BATCH_SIZE_DEFAULT = 32 ## TODO CHAGE TO 128
-MAX_STEPS_DEFAULT = 201 # TODO CHANGE TO 15000
+BATCH_SIZE_DEFAULT = 128 ## TODO CHAGE TO 128
+MAX_STEPS_DEFAULT = 501 # TODO CHANGE TO 15000
 EVAL_FREQ_DEFAULT = 1000
 CHECKPOINT_FREQ_DEFAULT = 5000
 PRINT_FREQ_DEFAULT = 10
@@ -59,7 +59,7 @@ def train():
   ########################
   # PUT YOUR CODE HERE  #
   ########################
-  model =  ConvNet( n_classes=10)
+  model =  ConvNet( n_classes=10,residual=False, dropout_rate=0.0,batch_norm=False, use_gpu=False)
 
   x = tf.placeholder(dtype=tf.float32, shape=[None, 32, 32, 3])
   labels = tf.placeholder(dtype=tf.float32, shape=[None, 10])
@@ -81,9 +81,8 @@ def train():
       train_data, train_labels = cifar_10.train.next_batch(batch_size = FLAGS.batch_size)
       #Perform training step
       t, loss_e = sess.run([train_op, loss], feed_dict={x:train_data, labels:train_labels })
-
       #Every 100th iteratin print accuracy on the whole test set.
-      if i % 100 == 0:
+      if i % 10 == 0:
         accuracy_e, loss_e = sess.run([accuracy, loss],feed_dict={x:test_data,labels:test_labels } )
         print('-- Step: ', i, " accuracy: ",accuracy_e,'loss', loss_e )
   ########################  ########################

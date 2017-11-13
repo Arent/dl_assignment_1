@@ -24,8 +24,9 @@ class MLP(object):
   """
 
   def __init__(self, n_hidden, n_classes, is_training,input_dim=32*32*3,
-               activation_fn = tf.nn.relu, dropout_rate = 0.1,
-               weight_initializer = xavier_initializer(),
+               activation_fn = tf.nn.relu,
+               weight_initializer = xavier_initializer,
+               initializer_stddev = None,
                weight_regularizer = l2_regularizer(0.005),
                optimizer= tf.train.AdamOptimizer(0.002)):
     """
@@ -61,7 +62,6 @@ class MLP(object):
     self.n_classes = n_classes
     self.is_training = is_training
     self.activation_fn = activation_fn
-    self.dropout_rate = dropout_rate
     self.weight_initializer = weight_initializer
     self.weight_regularizer = weight_regularizer
     self.optimizer = optimizer
@@ -73,25 +73,36 @@ class MLP(object):
     #Also it creates the weight and bias viariables. 
     for i, (size_in, size_out) in enumerate(zip(in_sizes,out_sizes)):
       with tf.variable_scope("layer" + str(i+1)):
-        weights = tf.get_variable("weights", shape=[size_in, size_out], 
-                                  initializer=self.weight_initializer,
-                                  regularizer=self.weight_regularizer)
+        if initializer_stddev is not None:
+          weights = tf.get_variable("weights", 
+                                  initializer=self.weight_initializer(shape=[size_in, size_out], stddev=initializer_stddev),regularizer=self.weight_regularizer)
+        else:
+          weights = tf.get_variable("weights", 
+                                  initializer=self.weight_initializer(shape=[size_in, size_out]),regularizer=self.weight_regularizer)
         biases = tf.get_variable("biases", initializer=tf.zeros([size_out]))
 
 
 
-  def fully_connected_layer(self, layer_name, x, activation_fn ):
+  def fully_connected_layer(self, layer_name, input, activation_fn, dropout_rate):
     # This function creates a fully connected layer.
     with tf.variable_scope(layer_name, reuse=True):
       weights = tf.get_variable("weights")
       biases = tf.get_variable("biases")
-      output = tf.matmul(x, weights) + biases
-      activated_output = activation_fn(output)
-      activated_output_with_dropout = tf.nn.dropout(activated_output, self.dropout_rate) 
-    return activated_output_with_dropout
+      input_dropout = tf.nn.dropout(input, 1- dropout_rate) 
+      output = tf.matmul(input, weights) + biases
+
+      tf.summary.histogram("output", output, collections=['test'])
+      if activation_fn is not None:
+        output = activation_fn(output)
+        tf.summary.histogram("activated_output", output, collections=['test'])
+      
+      tf.summary.histogram("weights", weights, collections=['test'])
+      tf.summary.histogram("biases", biases, collections=['test'])
+
+    return output
 
 
-  def inference(self, x):
+  def inference(self, x, dropout_rate):
     """
     Performs inference given an input tensor. This is the central portion
     of the network. Here an input tensor is transformed through application
@@ -130,17 +141,19 @@ class MLP(object):
     #compute hidden layers, the output of one layer is the input in the next layer. 
     #For the first alter x is the input. 
 
-    output = x
-    print(x)
-    for i, size in enumerate(self.n_hidden):
-      output = self.fully_connected_layer('layer'+str(i+1), output, self.activation_fn)
+    #compute first layer
+    output = self.fully_connected_layer('layer'+str(1), x, self.activation_fn, dropout_rate=0)
+    
+    #compute hidden layers, all but the last
+    for i, size in enumerate(self.n_hidden[:-1]):
+      print("do hidden layers")
+      output = self.fully_connected_layer('layer'+str(i+2), output, self.activation_fn, dropout_rate)
 
-    #compute last layer
-    with tf.variable_scope('layer'+str(len(self.n_hidden)+1), reuse = True):
-      weights = tf.get_variable("weights")
-      biases = tf.get_variable("biases")
-      logits = tf.matmul(output, weights) + biases
-      #last layer has no activation or dropout. 
+    # Compute last later
+    logits = self.fully_connected_layer('layer'+str(len(self.n_hidden)+1), output, None, dropout_rate)
+
+    tf.summary.histogram("logits", logits, collections=['test'])
+    #   #last layer has no activation or dropout. 
       ########################
     # END OF YOUR CODE    #
     #######################
@@ -174,7 +187,12 @@ class MLP(object):
     # PUT YOUR CODE HERE  #
     #######################
     #The function softmax_cross_entropy_with_logits is robust against numerical instabilities
+
+    reg_variables = tf.get_collection(tf.GraphKeys.REGULARIZATION_LOSSES)
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=labels))
+    loss += sum(reg_variables)
+    summary_loss = tf.summary.scalar("loss", loss, collections=['test', 'train'])
+
     ########################
     # END OF YOUR CODE    #
     #######################
@@ -231,6 +249,7 @@ class MLP(object):
 
     correct   = tf.equal(tf.argmax(logits, 1), tf.argmax(labels, 1))
     accuracy  = tf.reduce_mean(tf.cast(correct, tf.float32))
+    tf.summary.scalar("accuracy", accuracy, collections=['test', 'train'])
     ########################
     # END OF YOUR CODE    #
     #######################

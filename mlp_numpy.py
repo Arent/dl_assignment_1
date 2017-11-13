@@ -46,10 +46,9 @@ class MLP(object):
 
     self.layers = []
     for  size_in, size_out in zip([self. input_dim]+ self.n_hidden , self.n_hidden + [self.n_classes]):
-      #TODO FIX BIAS NO BATHC
       layer = {}
       layer["weights"] = np.random.normal(0, weight_scale, [size_in, size_out]) 
-      layer["bias"]  = np.zeros([batch_size, size_out])
+      layer["bias"]  = np.zeros([1, size_out])
       layer["activation_function"] = self.relu 
 
       self.layers.append(layer)
@@ -130,12 +129,18 @@ class MLP(object):
     # another aprouch would be: -np.sum(np.log((labels + labels -1) * logits1  + (1-labels)))
     # Which is only marginally faster
     # TODO MAKE PRETIER
-    loss_label_1 = -np.sum(np.log(np.maximum(1- logits.flatten()[labels.flatten() ==1], 10**(-10)))) 
-    # print('loss_label_1',loss_label_1)
+
+    regularization_loss = 0
+    regularization_loss_der = 0
+    for layer in self.layers:
+      regularization_loss +=  np.sum( np.dot(layer["weights"].T, layer["weights"])) * self.weight_decay /2.0
+
+      regularization_loss_der += np.sum(np.abs(layer["weights"])) * self.weight_decay
+
+    loss_label_1 = -np.sum(np.log(np.maximum(logits.flatten()[labels.flatten() ==1], 10**(-10)))) 
     loss_label_0 = -np.sum(np.log(np.maximum(1- logits.flatten()[labels.flatten() ==0], 10**(-10)))) 
-    loss = (loss_label_1 + loss_label_0)/logits.shape[0]
-    # print('loss_label_0',loss_label_0)
-    self.loss_derivative = logits - labels
+    loss = (loss_label_1 + loss_label_0*1)/logits.shape[0] + regularization_loss
+    self.loss_derivative = logits - labels  #+ regularization_loss_der
 
       ########################
     # END OF YOUR CODE    #
@@ -172,12 +177,14 @@ class MLP(object):
 
     #Calculate derivatives for the weights and bias and apply them
     #The 'activated output' of the first layer is just the input
-    self.layers[0]["weights_derivative"]  = self.input.T.dot(self.layers[0]["delta"]) 
+    self.layers[0]["weights_derivative"]  = self.input.T.dot(self.layers[0]["delta"])/float(flags.batch_size) +  self.weight_decay * np.abs(self.layers[0]["weights"])
+
     # loop over the layers, layer_i_1 = layer i-1, layer_i =layer i
     for layer_i_1, layer_i in zip(self.layers, self.layers[1:]):
-      layer_i["weights_derivative"]  = layer_i_1["activated_output"].T.dot(layer_i['delta']) 
-      layer_i["weights"] -= flags.learning_rate*(layer_i["weights_derivative"]/flags.batch_size)
-      layer_i["bias"] -= flags.learning_rate*(layer_i["delta"]/flags.batch_size)
+      layer_i["weights_derivative"]  = layer_i_1["activated_output"].T.dot(layer_i['delta'])/float(flags.batch_size) + self.weight_decay * np.abs(layer_i["weights"])
+      
+      layer_i["weights"] -= flags.learning_rate*(layer_i["weights_derivative"])
+      layer_i["bias"] -= flags.learning_rate*(np.sum(layer_i["delta"], axis=0)[np.newaxis,:]/float(flags.batch_size))
 
     
 
